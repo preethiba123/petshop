@@ -1,0 +1,64 @@
+name: CI/CD - Pet Shop Frontend
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+env:
+  IMAGE_NAME: petshop
+  TAG: v${{ github.run_number }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build Vite app
+        working-directory: ./frontend
+        run: npm run build
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub (temporary registry)
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/petshop:${{ env.TAG }}
+
+      # Optional: deploy to AKS (you can uncomment later)
+      # - name: Azure Login
+      #   uses: azure/login@v2
+      #   with:
+      #     creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # - name: Set AKS context
+      #   uses: azure/aks-set-context@v3
+      #   with:
+      #     resource-group: ${{ secrets.AKS_RG }}
+      #     cluster-name: ${{ secrets.AKS_CLUSTER }}
+
+      # - name: Deploy to AKS
+      #   run: |
+      #     kubectl set image deployment/petshop-web petshop-web=${{ secrets.ACR_LOGIN_SERVER }}/petshop:${{ env.TAG }} -n petshop
+      #     kubectl rollout status deployment/petshop-web -n petshop
